@@ -8,23 +8,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:call_log_exporter/main.dart';
+import 'package:calllog_exporter/main.dart';
+import 'package:calllog_exporter/call_log_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('Call Log Exporter smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const CallLogExporterApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that our app title is displayed.
+    expect(find.text('Call Log Exporter'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify that load button exists.
+    expect(find.text('Load Call Logs'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify that export button exists.
+    expect(find.text('Export CSV'), findsOneWidget);
+
+    // Verify that share button exists.
+    expect(find.text('Share File'), findsOneWidget);
   });
 }
