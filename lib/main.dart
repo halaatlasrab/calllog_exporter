@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 void main() {
   runApp(const CallLogExporterApp());
@@ -35,7 +32,7 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
   List<Map<String, dynamic>> callLogs = [];
   bool isLoading = false;
   String? error;
-  File? exportedFile;
+  String? exportedFilePath;
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +66,9 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                       'Call logs found: ${callLogs.length}',
                       style: const TextStyle(fontSize: 14),
                     ),
-                    if (exportedFile != null)
+                    if (exportedFilePath != null)
                       Text(
-                        'CSV exported: ${exportedFile!.path}',
+                        'CSV exported: $exportedFilePath',
                         style: const TextStyle(fontSize: 14),
                       ),
                   ],
@@ -113,20 +110,6 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: exportedFile == null ? null : () => shareFile(),
-                        icon: const Icon(Icons.share),
-                        label: const Text('Share File'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange[700],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -144,15 +127,7 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
     });
 
     try {
-      // Request permissions
-      final phonePermission = await Permission.phone.request();
-      final contactsPermission = await Permission.contacts.request();
-      
-      if (!phonePermission.isGranted || !contactsPermission.isGranted) {
-        throw Exception('Phone and contacts permissions are required');
-      }
-
-      // Mock call logs for now (real call log reading requires native code)
+      // Mock call logs for demonstration
       await Future.delayed(const Duration(seconds: 2));
       
       List<Map<String, dynamic>> mockLogs = [
@@ -193,10 +168,6 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
 
   Future<void> exportToCsv() async {
     try {
-      // Get the documents directory
-      final directory = await getApplicationDocumentsDirectory();
-      final path = '${directory.path}/call_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
-      
       // Create CSV data
       List<List<dynamic>> rows = [];
       rows.add(['Phone Number', 'Contact Name', 'Call Type', 'Timestamp', 'Duration (seconds)']);
@@ -221,41 +192,25 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
       // Convert to CSV string
       String csv = const ListToCsvConverter().convert(rows);
       
-      // Write to file
-      final file = File(path);
+      // Save to downloads directory
+      final directory = Directory('/Users/sino/Downloads');
+      final fileName = 'call_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final file = File('${directory.path}/$fileName');
       await file.writeAsString(csv);
       
       setState(() {
-        exportedFile = file;
+        exportedFilePath = file.path;
       });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('CSV exported successfully!')),
+          SnackBar(content: Text('CSV exported to Downloads: $fileName')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Export failed: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> shareFile() async {
-    if (exportedFile == null) return;
-    
-    try {
-      await Share.shareXFiles(
-        [XFile(exportedFile!.path)],
-        subject: 'Call Logs Export',
-        text: 'Exported call logs from Call Log Exporter app',
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Share failed: $e')),
         );
       }
     }
