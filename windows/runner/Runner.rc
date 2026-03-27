@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "call_log_exporter" "\0"
+            VALUE "FileDescription", "log_contacts_exporter" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "call_log_exporter" "\0"
+            VALUE "InternalName", "log_contacts_exporter" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "call_log_exporter.exe" "\0"
-            VALUE "ProductName", "call_log_exporter" "\0"
+            VALUE "OriginalFilename", "log_contacts_exporter.exe" "\0"
+            VALUE "ProductName", "log_contacts_exporter" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

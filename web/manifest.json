@@ -1,6 +1,6 @@
 {
-    "name": "call_log_exporter",
-    "short_name": "call_log_exporter",
+    "name": "log_contacts_exporter",
+    "short_name": "log_contacts_exporter",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
