@@ -3,8 +3,6 @@ name: Build APK
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   build:
@@ -13,27 +11,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
-        cache: true
         
-    - name: Get dependencies
-      run: flutter pub get
-      
-    - name: Build APK (debug mode to avoid NDK)
+    - name: Build APK
       run: flutter build apk --debug
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: calllog-exporter-debug.apk
+        name: app.apk
         path: build/app/outputs/flutter-apk/app-debug.apk
-        retention-days: 30
