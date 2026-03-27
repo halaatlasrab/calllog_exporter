@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:csv/csv.dart';
 
 void main() {
   runApp(const CallLogExporterApp());
@@ -168,9 +167,8 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
 
   Future<void> exportToCsv() async {
     try {
-      // Create CSV data
-      List<List<dynamic>> rows = [];
-      rows.add(['Phone Number', 'Contact Name', 'Call Type', 'Timestamp', 'Duration (seconds)']);
+      // Create CSV data manually
+      String csvData = 'Phone Number,Contact Name,Call Type,Timestamp,Duration (seconds)\n';
       
       // Add call log entries
       for (final log in callLogs) {
@@ -180,23 +178,14 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
           phoneNumber = '0' + phoneNumber.substring(4);
         }
         
-        rows.add([
-          phoneNumber,
-          log['contactName'] ?? '',
-          log['callType'],
-          log['timestamp'].toString(),
-          log['duration'].toString(),
-        ]);
+        csvData += '$phoneNumber,${log['contactName'] ?? ''},${log['callType']},${log['timestamp']},${log['duration']}\n';
       }
-      
-      // Convert to CSV string
-      String csv = const ListToCsvConverter().convert(rows);
       
       // Save to downloads directory
       final directory = Directory('/Users/sino/Downloads');
       final fileName = 'call_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
       final file = File('${directory.path}/$fileName');
-      await file.writeAsString(csv);
+      await file.writeAsString(csvData);
       
       setState(() {
         exportedFilePath = file.path;
