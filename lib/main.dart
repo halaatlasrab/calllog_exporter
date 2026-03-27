@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'call_log_service.dart';
+import 'csv_export_service.dart';
+import 'call_log_entry.dart';
 
 void main() {
   runApp(const CallLogExporterApp());
@@ -27,8 +31,11 @@ class CallLogExporterScreen extends StatefulWidget {
 }
 
 class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
+  List<CallLogEntry> callLogs = [];
   bool isLoading = false;
-  String status = 'Ready';
+  String? error;
+  File? exportedFile;
+  bool useLast30DaysFilter = false;
 
   @override
   Widget build(BuildContext context) {
@@ -51,16 +58,47 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Status: ${isLoading ? "Loading..." : status}',
+                      'Status: ${isLoading ? "Loading..." : error ?? "Ready"}',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Call logs found: 3',
-                      style: TextStyle(fontSize: 14),
+                    Text(
+                      'Call logs found: ${callLogs.length}',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    if (exportedFile != null)
+                      Text(
+                        'CSV exported: ${exportedFile!.path}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Filter Toggle
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    const Text('Filter:'),
+                    const Spacer(),
+                    Switch(
+                      value: useLast30DaysFilter,
+                      onChanged: (value) {
+                        setState(() {
+                          useLast30DaysFilter = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      useLast30DaysFilter ? 'Last 30 days' : 'All logs',
                     ),
                   ],
                 ),
@@ -91,7 +129,7 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () => exportToCsv(),
+                        onPressed: callLogs.isEmpty ? null : () => exportToCsv(),
                         icon: const Icon(Icons.file_download),
                         label: const Text('Export CSV'),
                         style: ElevatedButton.styleFrom(
@@ -105,11 +143,25 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () => shareFile(),
+                        onPressed: exportedFile == null ? null : () => shareFile(),
                         icon: const Icon(Icons.share),
                         label: const Text('Share File'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange[700],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: callLogs.isEmpty ? null : () => exportAndShare(),
+                        icon: const Icon(Icons.send),
+                        label: const Text('Export & Share'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple[700],
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
@@ -125,40 +177,68 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
     );
   }
 
-  void loadCallLogs() async {
+  Future<void> loadCallLogs() async {
     setState(() {
       isLoading = true;
-      status = 'Loading call logs...';
+      error = null;
     });
 
-    // Simulate loading
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      isLoading = false;
-      status = 'Ready - 3 call logs loaded';
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Call logs loaded successfully!')),
-      );
+    try {
+      final logs = useLast30DaysFilter 
+          ? await CallLogService.getLast30DaysCallLogs()
+          : await CallLogService.getCallLogs();
+      
+      setState(() {
+        callLogs = logs;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        error = e.toString();
+        isLoading = false;
+      });
     }
   }
 
-  void exportToCsv() {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('CSV exported successfully!')),
-      );
+  Future<void> exportToCsv() async {
+    try {
+      final file = await CsvExportService.exportToCsv(callLogs);
+      setState(() {
+        exportedFile = file;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CSV exported successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
     }
   }
 
-  void shareFile() {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Share functionality ready!')),
-      );
+  Future<void> shareFile() async {
+    if (exportedFile == null) return;
+    
+    try {
+      await CsvExportService.shareFile(exportedFile!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> exportAndShare() async {
+    await exportToCsv();
+    if (exportedFile != null) {
+      await shareFile();
     }
   }
 }
