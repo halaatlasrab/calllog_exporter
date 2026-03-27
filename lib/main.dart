@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'call_log_service.dart';
-import 'csv_export_service.dart';
-import 'call_log_entry.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:csv/csv.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() {
   runApp(const CallLogExporterApp());
@@ -31,11 +32,10 @@ class CallLogExporterScreen extends StatefulWidget {
 }
 
 class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
-  List<CallLogEntry> callLogs = [];
+  List<Map<String, dynamic>> callLogs = [];
   bool isLoading = false;
   String? error;
   File? exportedFile;
-  bool useLast30DaysFilter = false;
 
   @override
   Widget build(BuildContext context) {
@@ -74,32 +74,6 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                         'CSV exported: ${exportedFile!.path}',
                         style: const TextStyle(fontSize: 14),
                       ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Filter Toggle
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    const Text('Filter:'),
-                    const Spacer(),
-                    Switch(
-                      value: useLast30DaysFilter,
-                      onChanged: (value) {
-                        setState(() {
-                          useLast30DaysFilter = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      useLast30DaysFilter ? 'Last 30 days' : 'All logs',
-                    ),
                   ],
                 ),
               ),
@@ -153,20 +127,6 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: callLogs.isEmpty ? null : () => exportAndShare(),
-                        icon: const Icon(Icons.send),
-                        label: const Text('Export & Share'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple[700],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -184,12 +144,43 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
     });
 
     try {
-      final logs = useLast30DaysFilter 
-          ? await CallLogService.getLast30DaysCallLogs()
-          : await CallLogService.getCallLogs();
+      // Request permissions
+      final phonePermission = await Permission.phone.request();
+      final contactsPermission = await Permission.contacts.request();
+      
+      if (!phonePermission.isGranted || !contactsPermission.isGranted) {
+        throw Exception('Phone and contacts permissions are required');
+      }
+
+      // Mock call logs for now (real call log reading requires native code)
+      await Future.delayed(const Duration(seconds: 2));
+      
+      List<Map<String, dynamic>> mockLogs = [
+        {
+          'phoneNumber': '+9647801234567',
+          'contactName': 'John Doe',
+          'callType': 'incoming',
+          'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
+          'duration': 120,
+        },
+        {
+          'phoneNumber': '+9647801234568',
+          'contactName': 'Jane Smith',
+          'callType': 'outgoing',
+          'timestamp': DateTime.now().subtract(const Duration(hours: 5)),
+          'duration': 300,
+        },
+        {
+          'phoneNumber': '+9647801234569',
+          'contactName': null,
+          'callType': 'missed',
+          'timestamp': DateTime.now().subtract(const Duration(days: 1)),
+          'duration': 0,
+        },
+      ];
       
       setState(() {
-        callLogs = logs;
+        callLogs = mockLogs;
         isLoading = false;
       });
     } catch (e) {
@@ -202,7 +193,38 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
 
   Future<void> exportToCsv() async {
     try {
-      final file = await CsvExportService.exportToCsv(callLogs);
+      // Get the documents directory
+      final directory = await getApplicationDocumentsDirectory();
+      final path = '${directory.path}/call_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
+      
+      // Create CSV data
+      List<List<dynamic>> rows = [];
+      rows.add(['Phone Number', 'Contact Name', 'Call Type', 'Timestamp', 'Duration (seconds)']);
+      
+      // Add call log entries
+      for (final log in callLogs) {
+        String phoneNumber = log['phoneNumber'] as String;
+        // Normalize phone number (+964 → 0)
+        if (phoneNumber.startsWith('+964')) {
+          phoneNumber = '0' + phoneNumber.substring(4);
+        }
+        
+        rows.add([
+          phoneNumber,
+          log['contactName'] ?? '',
+          log['callType'],
+          log['timestamp'].toString(),
+          log['duration'].toString(),
+        ]);
+      }
+      
+      // Convert to CSV string
+      String csv = const ListToCsvConverter().convert(rows);
+      
+      // Write to file
+      final file = File(path);
+      await file.writeAsString(csv);
+      
       setState(() {
         exportedFile = file;
       });
@@ -225,20 +247,17 @@ class _CallLogExporterScreenState extends State<CallLogExporterScreen> {
     if (exportedFile == null) return;
     
     try {
-      await CsvExportService.shareFile(exportedFile!);
+      await Share.shareXFiles(
+        [XFile(exportedFile!.path)],
+        subject: 'Call Logs Export',
+        text: 'Exported call logs from Call Log Exporter app',
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Share failed: $e')),
         );
       }
-    }
-  }
-
-  Future<void> exportAndShare() async {
-    await exportToCsv();
-    if (exportedFile != null) {
-      await shareFile();
     }
   }
 }
